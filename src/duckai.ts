@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
+import { DUCKAI_MODELS } from "./models";
 
 // Rate limiting tracking with sliding window
 interface RateLimitInfo {
@@ -227,7 +228,7 @@ export class DuckAI {
   }
 
   private async getVQD(userAgent: string): Promise<VQDResponse> {
-    const response = await fetch("https://duckduckgo.com/duckchat/v1/status", {
+    const response = await fetch("https://duck.ai/duckchat/v1/status", {
       headers: {
         accept: "*/*",
         "accept-language": "en-US,en;q=0.9,fa;q=0.8",
@@ -240,7 +241,7 @@ export class DuckAI {
         "x-vqd-accept": "1",
         "User-Agent": userAgent,
       },
-      referrer: "https://duckduckgo.com/",
+      referrer: "https://duck.ai/",
       referrerPolicy: "origin",
       method: "GET",
       mode: "cors",
@@ -278,6 +279,36 @@ export class DuckAI {
     );
   }
 
+  private async fetchDuckAIEndpoint(
+    request: DuckAIRequest,
+    userAgent: string,
+    vqd: VQDResponse,
+  ): Promise<Response> {
+    return await fetch("https://duck.ai/duckchat/v1/chat", {
+      headers: {
+        accept: "text/event-stream",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
+        "content-type": "application/json",
+        pragma: "no-cache",
+        priority: "u=0",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-fe-signals": process.env.X_FE_SIGNALS,
+        "x-fe-version": process.env.X_FE_VERSION,
+        "User-Agent": userAgent,
+        "x-vqd-hash-1": vqd.hash,
+      },
+      referrer: "https://duck.ai/",
+      referrerPolicy: "origin",
+      body: JSON.stringify(request),
+      method: "POST",
+      mode: "cors",
+      credentials: "include",
+    });
+  }
+
   async chat(request: DuckAIRequest): Promise<string> {
     // Wait if rate limiting is needed
     await this.waitIfNeeded();
@@ -294,28 +325,7 @@ export class DuckAI {
     // Show compact rate limit status in server console
     this.rateLimitMonitor.printCompactStatus();
 
-    const response = await fetch("https://duckduckgo.com/duckchat/v1/chat", {
-      headers: {
-        accept: "text/event-stream",
-        "accept-language": "en-US,en;q=0.9,fa;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        pragma: "no-cache",
-        priority: "u=1, i",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-fe-version": "serp_20250401_100419_ET-19d438eb199b2bf7c300",
-        "User-Agent": userAgent,
-        "x-vqd-hash-1": vqd.hash,
-      },
-      referrer: "https://duckduckgo.com/",
-      referrerPolicy: "origin",
-      body: JSON.stringify(request),
-      method: "POST",
-      mode: "cors",
-      credentials: "include",
-    });
+    const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
 
     // Handle rate limiting
     if (response.status === 429) {
@@ -387,28 +397,7 @@ export class DuckAI {
     // Show compact rate limit status in server console
     this.rateLimitMonitor.printCompactStatus();
 
-    const response = await fetch("https://duckduckgo.com/duckchat/v1/chat", {
-      headers: {
-        accept: "text/event-stream",
-        "accept-language": "en-US,en;q=0.9,fa;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        pragma: "no-cache",
-        priority: "u=1, i",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-fe-version": "serp_20250401_100419_ET-19d438eb199b2bf7c300",
-        "User-Agent": userAgent,
-        "x-vqd-hash-1": vqd.hash,
-      },
-      referrer: "https://duckduckgo.com/",
-      referrerPolicy: "origin",
-      body: JSON.stringify(request),
-      method: "POST",
-      mode: "cors",
-      credentials: "include",
-    });
+    const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
 
     // Handle rate limiting
     if (response.status === 429) {
@@ -467,14 +456,15 @@ export class DuckAI {
   }
 
   getAvailableModels(): string[] {
-    return [
-      "gpt-4o-mini",
-      "gpt-5-mini",
-      "claude-3-5-haiku-latest",
-      "claude-haiku-4-5",
-      "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-      "mistralai/Mistral-Small-24B-Instruct-2501",
-      "openai/gpt-oss-120b",
-    ];
+    return Object.keys(DUCKAI_MODELS);
+    // return [
+    //   "gpt-4o-mini",
+    //   "gpt-5-mini",
+    //   "claude-3-5-haiku-latest",
+    //   "claude-haiku-4-5",
+    //   "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    //   "mistralai/Mistral-Small-24B-Instruct-2501",
+    //   "tinfoil/gpt-oss-120b",
+    // ];
   }
 }

@@ -1,4 +1,6 @@
 import { ChatCompletionContentPart } from "openai/src/resources.js";
+import { ChatCompletionReasoningEffort } from "openai/src/resources/chat/completions.js";
+import { DuckAIReasoningEffort } from "./models";
 
 // OpenAI API Types
 type ChatCompletionMessageRole =
@@ -80,6 +82,7 @@ export interface ChatCompletionRequest {
   stop?: string | string[];
   tools?: ToolDefinition[];
   tool_choice?: ToolChoice;
+  reasoning_effort: DuckAIReasoningEffort;
 }
 
 export interface ChatCompletionChoice {
@@ -154,4 +157,6 @@ export interface DuckAIRequest {
   model: string;
   messages: DuckChatCompletionMessage[];
   metadata?: DuckAIMetadata;
+  reasoningEffort?: DuckAIReasoningEffort;
+  canUseTools: boolean;
 }

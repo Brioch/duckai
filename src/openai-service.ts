@@ -16,6 +16,7 @@ import type {
   DuckChatCompletionMessage,
   DuckChatCompletionContentPartImage,
 } from "./types";
+import { DUCKAI_MODELS } from "./models";
 
 export class OpenAIService {
   private duckAI: DuckAI;
@@ -78,11 +79,16 @@ export class OpenAIService {
     request: ChatCompletionRequest,
   ): DuckAIRequest {
     // Use the model from request, fallback to default
-    const model = request.model || "mistralai/Mistral-Small-24B-Instruct-2501";
+    const model = request.model || "gpt-4o-mini";
+
+    if (!(model in DUCKAI_MODELS)) {
+      throw new Error(
+        `Model ${model} is not a valid model, valid models: ${Object.keys(DUCKAI_MODELS).join(", ")}`,
+      );
+    }
 
     const transformedMessages: DuckChatCompletionMessage[] = [];
 
-    // TODO: USE OPENAI TYPES INSTEAD OF MY OWN TYPES (DIDNT KNOW THEY EXISTED)
     for (const message of request.messages as ChatCompletionMessage[]) {
       if (Array.isArray(message.content)) {
         const transformedContent = [];
@@ -130,10 +136,26 @@ export class OpenAIService {
       }
     }
 
+    // validate reasoning effort
+    const reasoning_effort =
+      request.reasoning_effort || DUCKAI_MODELS[model].reasoning_effort;
+
+    if (
+      DUCKAI_MODELS[model].valid_reasoning_efforts != undefined &&
+      !DUCKAI_MODELS[model].valid_reasoning_efforts?.includes(reasoning_effort)
+    ) {
+      throw new Error(
+        `Model ${model} does not support this reasoning effort (${reasoning_effort}),
+        valid reasoning efforts: ${(DUCKAI_MODELS[model].valid_reasoning_efforts || []).join(", ")}`,
+      );
+    }
+
     return {
-      model,
+      canUseTools: true,
       messages: transformedMessages,
       metadata: request.metadata,
+      model,
+      reasoningEffort: reasoning_effort,
     };
   }
 
@@ -706,6 +728,7 @@ Please follow these instructions when responding to the following user message.`
       stop: request.stop,
       tools: request.tools,
       tool_choice: request.tool_choice,
+      reasoning_effort: request.reasoning_effort,
     };
   }
 
