@@ -6,10 +6,15 @@ import type {
   ChatCompletionMessage,
   VQDResponse,
   DuckAIRequest,
+  DuckChatCompletionMessage,
+  ChatCompletionRequest,
+  DuckChatCompletionContentPartImage,
+  DuckChatCompletionContentPartFile,
 } from "./types";
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { DUCKAI_MODELS } from "./models";
+import { ChatCompletionContentPart } from "openai/src/resources.js";
 
 // Rate limiting tracking with sliding window
 interface RateLimitInfo {
@@ -466,5 +471,106 @@ export class DuckAI {
     //   "mistralai/Mistral-Small-24B-Instruct-2501",
     //   "tinfoil/gpt-oss-120b",
     // ];
+  }
+
+  static transformToDuckAIRequest(
+    request: ChatCompletionRequest,
+  ): DuckAIRequest {
+    // Use the model from request, fallback to default
+    const model = request.model || "gpt-4o-mini";
+
+    if (!(model in DUCKAI_MODELS)) {
+      throw new Error(
+        `Model ${model} is not a valid model, valid models: ${Object.keys(DUCKAI_MODELS).join(", ")}`,
+      );
+    }
+
+    const transformedMessages: DuckChatCompletionMessage[] = [];
+
+    for (const message of request.messages as ChatCompletionMessage[]) {
+      if (Array.isArray(message.content)) {
+        const transformedContent = [];
+        for (const content of message.content as ChatCompletionContentPart[]) {
+          if (content.type == "text") {
+            if (typeof content.text !== "string" || content.type !== "text") {
+              throw new Error("Image text must be a string of type text");
+            }
+
+            transformedContent.push(content);
+          } else if (content.type == "image_url") {
+            if (
+              content.image_url === null ||
+              typeof content.image_url?.url !== "string" ||
+              content.type !== "image_url"
+            ) {
+              throw new Error("Image payload is incorrect");
+            }
+
+            // valid image, transform to DuckChatCompletionRequest
+            const newImagePayload: DuckChatCompletionContentPartImage = {
+              image: content.image_url.url,
+              type: "image",
+              mimeType: content.image_url.url
+                .split(",")[0]
+                .split(":")[1]
+                .split(";")[0],
+            };
+            //console.log(newImagePayload);
+            transformedContent.push(newImagePayload);
+          } else if (content.type == "file") {
+            if (
+              content.file === null ||
+              typeof content.file.file_data != "string" ||
+              typeof content.file.filename != "string"
+            ) {
+              throw new Error("File payload is incorrect or missing");
+            }
+
+            // valid file, transform to DuckChatCompletionContentPartFile
+            const newFilePayload: DuckChatCompletionContentPartFile = {
+              content: content.file.file_data.split(",")[1],
+              encoding: content.file.file_data?.split(";")[1].split(",")[0],
+              filename: content.file.filename,
+              mimeType: content.file.file_data?.split(":")[1].split(";")[0],
+              type: "file",
+            };
+            //console.log(newFilePayload);
+            transformedContent.push(newFilePayload);
+          }
+        }
+
+        // transform message
+        const clonedMessage = structuredClone(message);
+        const newMessage = {
+          ...clonedMessage,
+          content: transformedContent,
+        };
+        transformedMessages.push(newMessage as DuckChatCompletionMessage);
+      } else {
+        transformedMessages.push(message as DuckChatCompletionMessage);
+      }
+    }
+
+    // validate reasoning effort
+    const reasoning_effort =
+      request.reasoning_effort || DUCKAI_MODELS[model].reasoning_effort;
+
+    if (
+      DUCKAI_MODELS[model].valid_reasoning_efforts != undefined &&
+      !DUCKAI_MODELS[model].valid_reasoning_efforts?.includes(reasoning_effort)
+    ) {
+      throw new Error(
+        `Model ${model} does not support this reasoning effort (${reasoning_effort}),
+        valid reasoning efforts: ${(DUCKAI_MODELS[model].valid_reasoning_efforts || []).join(", ")}`,
+      );
+    }
+
+    return {
+      canUseTools: true,
+      messages: transformedMessages,
+      metadata: request.metadata,
+      model,
+      reasoningEffort: reasoning_effort,
+    };
   }
 }

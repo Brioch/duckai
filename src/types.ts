@@ -35,9 +35,18 @@ export interface DuckChatCompletionContentPartImage {
   type: "image";
 }
 
+export interface DuckChatCompletionContentPartFile {
+  content: string;
+  encoding: string;
+  filename: string;
+  mimeType: string;
+  type: "file";
+}
+
 export type DuckChatCompletionContentPart =
   | DuckChatCompletionContentPartText
-  | DuckChatCompletionContentPartImage;
+  | DuckChatCompletionContentPartImage
+  | DuckChatCompletionContentPartFile;
 
 export interface FunctionDefinition {
   name: string;

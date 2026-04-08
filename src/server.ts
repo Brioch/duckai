@@ -39,7 +39,6 @@ const server = Bun.serve({
       if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
         const body = await req.json();
         const validatedRequest = openAIService.validateRequest(body);
-        console.log(body);
 
         // Handle streaming
         if (validatedRequest.stream) {
