@@ -314,6 +314,31 @@ export class DuckAI {
     });
   }
 
+  // i should probably rename this, eh
+  private async fuckThatTeapot(
+    request: DuckAIRequest,
+    userAgent: string,
+    vqd: VQDResponse,
+    attempt?: number,
+  ): Promise<Response> {
+    const response: Response = await this.fetchDuckAIEndpoint(
+      request,
+      userAgent,
+      vqd,
+    );
+    var currentAttempt = attempt || 0;
+    if (response.status == 418 && currentAttempt < 5) {
+      console.log("418'ed, fuck that shit run it back");
+      return await this.fuckThatTeapot(
+        request,
+        userAgent,
+        vqd,
+        currentAttempt + 1,
+      );
+    }
+    return response;
+  }
+
   async chat(request: DuckAIRequest): Promise<string> {
     // Wait if rate limiting is needed
     await this.waitIfNeeded();
@@ -330,7 +355,8 @@ export class DuckAI {
     // Show compact rate limit status in server console
     this.rateLimitMonitor.printCompactStatus();
 
-    const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
+    // const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
+    const response = await this.fuckThatTeapot(request, userAgent, vqd);
 
     // Handle rate limiting
     if (response.status === 429) {
@@ -402,7 +428,8 @@ export class DuckAI {
     // Show compact rate limit status in server console
     this.rateLimitMonitor.printCompactStatus();
 
-    const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
+    // const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
+    const response = await this.fuckThatTeapot(request, userAgent, vqd);
 
     // Handle rate limiting
     if (response.status === 429) {
