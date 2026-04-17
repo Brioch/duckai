@@ -339,7 +339,7 @@ export class DuckAI {
     return response;
   }
 
-  async chat(request: DuckAIRequest): Promise<string> {
+  async chat(request: DuckAIRequest, attempt?: number): Promise<string> {
     // Wait if rate limiting is needed
     await this.waitIfNeeded();
 
@@ -403,9 +403,12 @@ export class DuckAI {
 
     const finalResponse = llmResponse.trim();
 
-    // If response is empty, provide a fallback
-    if (!finalResponse) {
-      console.warn("Duck.ai returned empty response, using fallback");
+    // If response is empty, try 5 times and provide a fallback
+    var currentAttempt = attempt || 0;
+    if (!finalResponse && currentAttempt <= 5) {
+      console.warn("Duck.ai returned empty response, retrying call");
+      return this.chat(request, currentAttempt + 1);
+    } else if (currentAttempt > 5) {
       return "I apologize, but I'm unable to provide a response at the moment. Please try again.";
     }
 
