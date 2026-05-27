@@ -1,4 +1,3 @@
-import UserAgent from "user-agents";
 import { JSDOM } from "jsdom";
 import { RateLimitStore } from "./rate-limit-store";
 import { SharedRateLimitMonitor } from "./shared-rate-limit-monitor";
@@ -37,6 +36,22 @@ export class DuckAI {
   private readonly MAX_REQUESTS_PER_MINUTE = 20;
   private readonly WINDOW_SIZE_MS = 60 * 1000; // 1 minute
   private readonly MIN_REQUEST_INTERVAL_MS = 1000; // 1 second between requests
+
+  // Defaults used when the corresponding env var is unset. These mimic what
+  // duck.ai's web client currently sends and need to match what gets hashed
+  // into the VQD challenge response.
+  private static readonly DEFAULT_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
+  private static readonly DEFAULT_VQD_STACK =
+    "l@https://duck.ai/dist/duckai-dist/entry.duckai.c9340e95bd2f7fdc3302.js:2:1308110\n";
+
+  private get userAgent(): string {
+    return process.env.X_USER_AGENT || DuckAI.DEFAULT_USER_AGENT;
+  }
+
+  private get vqdStack(): string {
+    return process.env.X_VQD_STACK || DuckAI.DEFAULT_VQD_STACK;
+  }
 
   constructor() {
     this.rateLimitStore = new RateLimitStore();
@@ -220,14 +235,20 @@ export class DuckAI {
       [key: string]: any;
     };
 
-    result.client_hashes[0] =
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
+    result.client_hashes[0] = this.userAgent;
     result.client_hashes = result.client_hashes.map((t) => {
       const hash = createHash("sha256");
       hash.update(t);
 
       return hash.digest("base64");
     });
+
+    // duck.ai validates these meta fields; JSDOM can't produce them on its own
+    if (result.meta && typeof result.meta === "object") {
+      (result.meta as any).origin = "https://duck.ai";
+      (result.meta as any).stack = this.vqdStack;
+      (result.meta as any).duration = String(20 + Math.floor(Math.random() * 30));
+    }
 
     return btoa(JSON.stringify(result));
   }
@@ -343,7 +364,7 @@ export class DuckAI {
     // Wait if rate limiting is needed
     await this.waitIfNeeded();
 
-    const userAgent = new UserAgent().toString();
+    const userAgent = this.userAgent;
     const vqd = await this.getVQD(userAgent);
 
     // Update rate limit tracking BEFORE making the request
@@ -419,7 +440,7 @@ export class DuckAI {
     // Wait if rate limiting is needed
     await this.waitIfNeeded();
 
-    const userAgent = new UserAgent().toString();
+    const userAgent = this.userAgent;
     const vqd = await this.getVQD(userAgent);
 
     // Update rate limit tracking BEFORE making the request
