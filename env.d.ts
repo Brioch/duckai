@@ -3,6 +3,8 @@ declare module "bun" {
     // Add your environment variables here
     X_FE_SIGNALS: string;
     X_FE_VERSION: string;
+    X_USER_AGENT: string;
+    X_VQD_STACK: string;
     PORT: number;
     NODE_ENV: "development" | "production";
   }

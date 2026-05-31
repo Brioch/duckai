@@ -7,7 +7,7 @@
       "dependencies": {
         "jsdom": "^25.0.1",
         "openai": "^4.104.0",
-        "user-agents": "^1.1.669",
+        "user-agents": "^1.1.675",
       },
       "devDependencies": {
         "@types/jsdom": "^21.1.7",
