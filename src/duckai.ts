@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { DUCKAI_MODELS } from "./models";
 import { ChatCompletionContentPart } from "openai/src/resources.js";
+import { sleep } from "bun";
 
 // Rate limiting tracking with sliding window
 interface RateLimitInfo {
@@ -335,8 +336,8 @@ export class DuckAI {
     });
   }
 
-  // i should probably rename this, eh
-  private async fuckThatTeapot(
+  // retry in increasing intervals when 418 error code
+  private async safeFetchDuckAIEndpoint(
     request: DuckAIRequest,
     userAgent: string,
     vqd: VQDResponse,
@@ -349,13 +350,9 @@ export class DuckAI {
     );
     var currentAttempt = attempt || 0;
     if (response.status == 418 && currentAttempt < 5) {
-      console.log("418'ed, fuck that shit run it back");
-      return await this.fuckThatTeapot(
-        request,
-        userAgent,
-        vqd,
-        currentAttempt + 1,
-      );
+      const waitTime = currentAttempt + 1;
+      console.warn(`⚠️ Encountered error 418, waiting for ${waitTime} seconds before refetching. Attempt: ${currentAttempt + 1}`)
+      return await sleep(waitTime * 1000).then(() => this.safeFetchDuckAIEndpoint(request, userAgent, vqd, currentAttempt + 1))
     }
     return response;
   }
@@ -377,7 +374,7 @@ export class DuckAI {
     this.rateLimitMonitor.printCompactStatus();
 
     // const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
-    const response = await this.fuckThatTeapot(request, userAgent, vqd);
+    const response = await this.safeFetchDuckAIEndpoint(request, userAgent, vqd);
 
     // Handle rate limiting
     if (response.status === 429) {
@@ -453,7 +450,7 @@ export class DuckAI {
     this.rateLimitMonitor.printCompactStatus();
 
     // const response = await this.fetchDuckAIEndpoint(request, userAgent, vqd);
-    const response = await this.fuckThatTeapot(request, userAgent, vqd);
+    const response = await this.safeFetchDuckAIEndpoint(request, userAgent, vqd);
 
     // Handle rate limiting
     if (response.status === 429) {
